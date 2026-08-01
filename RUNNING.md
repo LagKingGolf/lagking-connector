@@ -29,7 +29,7 @@ the app will not start without it.
 ```powershell
 py -3.12 -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-.venv\Scripts\python MLM2Pro-GSPro-Connector.py
+.venv\Scripts\python LagKingConnector.py
 ```
 
 ### Bluetooth

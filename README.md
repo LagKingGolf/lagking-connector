@@ -8,7 +8,28 @@ A fork of [springbok/MLM2PRO-GSPro-Connector](https://github.com/springbok/MLM2P
 fork adds the LagKing putting input and makes it the default. See
 [RUNNING.md](RUNNING.md) to run it.
 
-## LagKing fork
+## Modifications from upstream (GPLv3 §5)
+
+This is a **modified version** of springbok's MLM2PRO-GSPro-Connector, released
+under the same GPL-3.0 licence. springbok is not affiliated with LagKing and
+does not endorse this fork. Changes by LagKing, 2026-05-08 and 2026-08-01:
+
+- **Added** a LagKing V3 BLE putting input (`src/bluetooth/lagking_device.py`,
+  `src/worker_device_lagking.py`, `src/device_putting_lagking.py`) and made it
+  the default, first-listed putting system. ExPutt and Webcam putting, and every
+  launch monitor, are unchanged and still available.
+- **Modified** `src/putting_settings.py`, `src/putting.py`, `src/PuttingForm.py`,
+  `src/ball_data.py`, `src/log_message.py` to register that input and its settings.
+- **Modified** `src/MainWindow.py`: renamed the application and its settings
+  directory, with migration from an upstream install.
+- **Modified** `src/bluetooth/mlm2pro_device.py` so a missing (gitignored)
+  `mlm2pro_secret.py` degrades instead of preventing startup from source.
+- **Renamed** the entry point and PyInstaller spec to `LagKingConnector`.
+- **Added** `tests/`, `RUNNING.md`.
+
+Complete corresponding source is this repository.
+
+## LagKing putting input
 
 This fork adds a third putting input alongside Webcam and ExPutt: the **LagKing V3**
 gate (https://lagking.com), a dual-laser break-beam putting device that
@@ -163,6 +184,8 @@ You can access Joe's YouTube channel [here](https://www.youtube.com/@JLagGOLF)
 
 ## Latest Release
 
-The latest release can be downloaded from [here](https://github.com/springbok/MLM2PRO-GSPro-Connector/releases)
+LagKing Connector releases: [LagKingGolf/lagking-connector/releases](https://github.com/LagKingGolf/lagking-connector/releases).
+
+Upstream's own releases (springbok's build, without the LagKing putting input) are [here](https://github.com/springbok/MLM2PRO-GSPro-Connector/releases)
 
 
