@@ -29,6 +29,17 @@ does not endorse this fork. Changes by LagKing, 2026-05-08 and 2026-08-01:
 
 Complete corresponding source is this repository.
 
+## Launch monitor support
+
+Every launch monitor springbok supports works here unchanged — this fork adds a
+putting input, it removes nothing.
+
+One exception, and it is not a LagKing change: **`Rapsodo MLM2PRO BT` does not
+work in LagKing Connector builds.** That path authenticates against Rapsodo's
+simulator API using a vendor key that upstream gitignores, so it is absent from
+our source and our binaries alike. Use the `Rapsodo MLM2PRO` entry (phone-mirror
+route) instead, or springbok's own release. See [RUNNING.md](RUNNING.md).
+
 ## LagKing putting input
 
 This fork adds a third putting input alongside Webcam and ExPutt: the
