@@ -11,7 +11,33 @@ from src.bluetooth.bluetooth_device_base import BluetoothDeviceBase
 from src.bluetooth.bluetooth_device_service import BluetoothDeviceService
 from src.bluetooth.bluetooth_utils import BluetoothUtils
 from src.bluetooth.mlm2pro_encryption import MLM2PROEncryption
-from src.bluetooth.mlm2pro_secret import MLM2PROSecret
+try:
+    from src.bluetooth.mlm2pro_secret import MLM2PROSecret
+except ImportError:                                    # pragma: no cover
+    # src/bluetooth/mlm2pro_secret.py is gitignored upstream (.gitignore:168) --
+    # it carries Rapsodo's API key, which springbok understandably does not
+    # publish. It is therefore ABSENT from every clone, and because MainWindow
+    # imports this module at startup its absence used to take the WHOLE app
+    # down: nobody could run from source, whatever launch monitor they owned.
+    #
+    # Degrade instead. Everything except the MLM2PRO *Bluetooth* path works
+    # without it -- including every screenshot/OCR monitor, the relay server,
+    # and LagKing putting -- and selecting MLM2PRO BT now fails with an
+    # explanation rather than a stack trace at import time.
+    class MLM2PROSecret:  # type: ignore[no-redef]
+        AVAILABLE = False
+
+        @staticmethod
+        def decrypt(_value):
+            raise RuntimeError(
+                'MLM2PRO Bluetooth support needs src/bluetooth/mlm2pro_secret.py, '
+                'which is not distributed with the source (it holds a vendor API '
+                'key). Every other launch monitor and LagKing putting work '
+                'without it.'
+            )
+else:                                                  # pragma: no cover
+    if not hasattr(MLM2PROSecret, 'AVAILABLE'):
+        MLM2PROSecret.AVAILABLE = True
 from src.bluetooth.mlm2pro_web_api import MLM2PROWebApi
 
 

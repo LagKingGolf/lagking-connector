@@ -32,7 +32,12 @@ class LogTableCols:
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     version = 'V1.04.51'
-    app_name = 'MLM2PRO-GSPro-Connector'
+    app_name = 'LagKing Connector'
+    # Settings/log directory under %LOCALAPPDATA%. NOT derived from app_name --
+    # they are separate strings, and this one is behavioural: change it and an
+    # existing install silently loses its settings. See migrate_legacy_appdata.
+    APPDATA_DIR = 'lagking-connector'
+    LEGACY_APPDATA_DIR = 'mlm2pro-gspro-connect'
     good_shot_color = '#62ff00'
     good_putt_color = '#fbff00'
     bad_shot_color = '#ff3800'
@@ -44,8 +49,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.launch_monitor = None
         self.edit_fields = {}
         self.app = app
-        self.app_paths = AppDataPaths('mlm2pro-gspro-connect')
+        self.app_paths = AppDataPaths(MainWindow.APPDATA_DIR)
         self.app_paths.setup()
+        MainWindow.migrate_legacy_appdata(self.app_paths)
         self.__setup_logging()
         self.settings = Settings(self.app_paths)
         self.gspro_connection = GSProConnection(self)
@@ -56,6 +62,45 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setWindowTitle(f"{MainWindow.app_name} {MainWindow.version}")
         self.__setup_ui()
         self.__auto_start()
+
+    @staticmethod
+    def migrate_legacy_appdata(app_paths):
+        """Carry settings over from an upstream MLM2PRO-GSPro-Connector install.
+
+        This fork renames the appdata directory, which would otherwise drop a
+        migrating user back to defaults -- they would lose their launch monitor
+        choice, their ROIs (which are laborious to redraw) and their GSPro
+        settings, with no error to explain it.
+
+        Copies ONLY when the new directory has no config yet, so it can never
+        overwrite settings the user has already made here. Best effort: a
+        failure means starting from defaults, which is annoying but not broken,
+        and is not worth blocking startup over.
+        """
+        import shutil
+        try:
+            new_root = os.path.dirname(app_paths.get_config_path(name='probe', ext='.json'))
+            if os.path.isdir(new_root) and os.listdir(new_root):
+                return                      # already has content; leave it alone
+            legacy_root = new_root.replace(
+                MainWindow.APPDATA_DIR, MainWindow.LEGACY_APPDATA_DIR
+            )
+            if legacy_root == new_root or not os.path.isdir(legacy_root):
+                return
+            os.makedirs(new_root, exist_ok=True)
+            copied = 0
+            for entry in os.listdir(legacy_root):
+                src_path = os.path.join(legacy_root, entry)
+                if os.path.isfile(src_path) and entry.endswith('.json'):
+                    shutil.copy2(src_path, os.path.join(new_root, entry))
+                    copied += 1
+            if copied:
+                logging.info(
+                    f'Migrated {copied} settings file(s) from the upstream '
+                    f'connector at {legacy_root}'
+                )
+        except Exception as e:
+            logging.debug(f'Legacy appdata migration skipped: {e}')
 
     def __setup_logging(self):
         settings = Settings(self.app_paths)

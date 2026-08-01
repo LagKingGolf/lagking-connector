@@ -1,5 +1,12 @@
-# MLM2PRO-GSPro-Connector (LagKing fork)
-GSPro connector for the MLM2Pro & Mevo+ Launch Monitors that includes Webcam, ExPutt, or **LagKing** putting.
+# LagKing Connector
+
+Free, open-source GSPro connector for a wide range of launch monitors, with
+**LagKing** measured putting built in alongside Webcam and ExPutt.
+
+A fork of [springbok/MLM2PRO-GSPro-Connector](https://github.com/springbok/MLM2PRO-GSPro-Connector)
+(GPL-3.0). Nearly all of the launch-monitor work here is springbok's; this
+fork adds the LagKing putting input and makes it the default. See
+[RUNNING.md](RUNNING.md) to run it.
 
 ## LagKing fork
 
