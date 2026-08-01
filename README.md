@@ -34,11 +34,10 @@ Complete corresponding source is this repository.
 Every launch monitor springbok supports works here unchanged — this fork adds a
 putting input, it removes nothing.
 
-One exception, and it is not a LagKing change: **`Rapsodo MLM2PRO BT` does not
-work in LagKing Connector builds.** That path authenticates against Rapsodo's
-simulator API using a vendor key that upstream gitignores, so it is absent from
-our source and our binaries alike. Use the `Rapsodo MLM2PRO` entry (phone-mirror
-route) instead, or springbok's own release. See [RUNNING.md](RUNNING.md).
+One build note: `Rapsodo MLM2PRO BT` needs `src/bluetooth/mlm2pro_secret.py`,
+which upstream gitignores, so it is absent from a fresh clone. Restore it from
+upstream history before building — see [RUNNING.md](RUNNING.md). Skip that step
+and MLM2PRO BT silently fails while everything else works.
 
 ## LagKing putting input
 

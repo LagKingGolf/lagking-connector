@@ -32,31 +32,31 @@ py -3.12 -m venv .venv
 .venv\Scripts\python LagKingConnector.py
 ```
 
-### ⚠️ Rapsodo MLM2PRO Bluetooth does not work in this build
+### Restore the Rapsodo secret before building (one command)
 
-`Rapsodo MLM2PRO BT` decrypts a Rapsodo web-API secret via
-`src/bluetooth/mlm2pro_secret.py`, which upstream gitignores (`.gitignore:168`)
-because it holds a vendor key. It is therefore absent from every clone, and no
-source build can use that path. Selecting it reports the missing key rather
-than crashing, but it will not connect.
+`Rapsodo MLM2PRO BT` authenticates against Rapsodo's simulator API using a key
+in `src/bluetooth/mlm2pro_secret.py`. That path is in `.gitignore` (line 170),
+so a fresh clone does **not** have the file on disk and MLM2PRO BT will fail.
 
-**This applies to released LagKing Connector binaries too**, not only to
-running from source — we build without the file, so it is absent from the exe
-as well. springbok's own releases are unaffected; they build with it.
+It is not lost — upstream committed it in 2024 and never deleted it. It lives on
+upstream's `BT-BLEAK` and `r10` branches, so any clone that fetches upstream can
+restore it:
 
-This is upstream's decision, not something this fork broke or can fix in code.
-The real fix is LagKing holding its own Rapsodo simulator-partner credential
-(the endpoint is `mlm.rapsodo.com/api/simulator/user/`), which is a business
-conversation, not a patch.
+```bash
+git fetch upstream
+git show 19ff295:src/bluetooth/mlm2pro_secret.py > src/bluetooth/mlm2pro_secret.py
+```
 
-MLM2PRO owners can use the `Rapsodo MLM2PRO` entry instead, which takes a
-different route: mirror the phone's Rapsodo Range display to the PC and the
-connector reads that window. Every other launch monitor, and LagKing putting,
-are unaffected.
+Verified 2026-08-01: restores cleanly and its encrypt/decrypt round-trips.
+It stays gitignored afterwards, so it will not be committed here.
 
-Note the two MLM2PRO entries are genuinely different mechanisms, not a
-preference — `MLM2PRO` is the phone-mirror route, `MLM2PRO BT` is direct
-Bluetooth.
+**Do this before `pyinstaller`, not just before running from source.** The file
+is read at MLM2PRODevice construction, so an exe built without it ships with
+MLM2PRO BT broken — and nothing about the build warns you.
+
+Note the two MLM2PRO entries are different mechanisms, not a preference:
+`MLM2PRO BT` is direct Bluetooth (needs the key above), `MLM2PRO` is the
+phone-mirror route (Rapsodo Range on the phone, mirrored to the PC, read by OCR).
 
 ### Bluetooth
 
