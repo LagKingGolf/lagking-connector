@@ -54,6 +54,9 @@ class LagKingDevice(BluetoothDeviceBase):
     WAKE_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8104}'))
     CLIENT_KIND_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8112}'))
     SOFT_SLEEP_NOW_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8113}'))
+    # READ|WRITE float: distance from the ball's start to the gate. The gate
+    # makes this user-configurable, so it must be read, not assumed.
+    SETUP_DISTANCE_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8127}'))
 
     # Value the gate expects on CLIENT_KIND to classify us as a connector
     # rather than a phone. Load-bearing: without it the gate applies the
@@ -68,10 +71,16 @@ class LagKingDevice(BluetoothDeviceBase):
     # ~v^1.5, NOT the textbook v^2 -- inverting it uses 1/1.5, not 1/2.
     STIMP_REF_SPEED_MPS = 1.83
     STIMP_ROLLOUT_EXPONENT = 1.5
-    SETUP_DISTANCE_FT = 2.0
+    # Fallback only. The live value is read from the gate on connect; this
+    # matches SETUP_DISTANCE_FT in the firmware's config.h and is used when
+    # the read fails or the gate is too old to expose the characteristic.
+    SETUP_DISTANCE_FT_DEFAULT = 2.0
 
     @classmethod
-    def launch_speed_mps(cls, measured_mps: float, surface_stimp: float) -> float:
+    def launch_speed_mps(
+        cls, measured_mps: float, surface_stimp: float,
+        setup_distance_ft: float = SETUP_DISTANCE_FT_DEFAULT,
+    ) -> float:
         """Recover speed at the putter from speed measured at the gate.
 
         GSPro, like any launch monitor consumer, wants ball speed AT LAUNCH.
@@ -94,13 +103,15 @@ class LagKingDevice(BluetoothDeviceBase):
         if measured_mps <= 0.0 or surface_stimp <= 0.01:
             return measured_mps
         remaining = (measured_mps / cls.STIMP_REF_SPEED_MPS) ** cls.STIMP_ROLLOUT_EXPONENT
-        total = remaining + (cls.SETUP_DISTANCE_FT / surface_stimp)
+        setup_ft = setup_distance_ft if setup_distance_ft > 0.01 else cls.SETUP_DISTANCE_FT_DEFAULT
+        total = remaining + (setup_ft / surface_stimp)
         return cls.STIMP_REF_SPEED_MPS * (total ** (1.0 / cls.STIMP_ROLLOUT_EXPONENT))
 
     def __init__(self, device: QBluetoothDeviceInfo):
         # Overwritten by apply_settings() before any putt arrives; this is
         # only the fallback if the settings push were ever missed.
         self._surface_stimp = 10.0
+        self._setup_distance_ft = LagKingDevice.SETUP_DISTANCE_FT_DEFAULT
         self._on_green = False
         self._services = []
         self._primary_service: BluetoothDeviceService = BluetoothDeviceService(
@@ -108,7 +119,7 @@ class LagKingDevice(BluetoothDeviceBase):
             LagKingDevice.SERVICE_UUID,
             [LagKingDevice.PUTT_CHAR_UUID],
             self._data_handler,
-            None,
+            self._read_handler,
         )
         self._services.append(self._primary_service)
         # As soon as we're subscribed the device is considered ready —
@@ -134,7 +145,33 @@ class LagKingDevice(BluetoothDeviceBase):
             bytearray([LagKingDevice.CLIENT_KIND_CONNECTOR]),
             'client-kind',
         )
+        # The gate makes setup distance user-configurable, so read the live
+        # value rather than assuming the 2.0 ft default -- a wrong value here
+        # biases every putt slightly, in a way nobody would spot.
+        try:
+            self._primary_service.read_characteristic(
+                LagKingDevice.SETUP_DISTANCE_CHAR_UUID
+            )
+        except Exception as e:
+            logging.debug(f'LagKing setup-distance read failed: {e}')
         self.launch_monitor_connected.emit()
+
+    def _read_handler(self, characteristic, data) -> None:
+        """Only the setup distance is read; anything else is ignored."""
+        if characteristic.uuid() != LagKingDevice.SETUP_DISTANCE_CHAR_UUID:
+            return
+        raw = bytes(data.data() if hasattr(data, 'data') else data)
+        if len(raw) < 4:
+            return
+        try:
+            (value,) = struct.unpack_from('<f', raw, 0)
+        except Exception:
+            return
+        # Clamped to the firmware's own accepted band; a garbage read must
+        # not silently skew the speed correction.
+        if 0.1 <= value <= 20.0:
+            self._setup_distance_ft = float(value)
+            logging.debug(f'LagKing setup distance from gate: {value:.2f} ft')
 
     def _write(self, uuid: QBluetoothUuid, data: bytearray, what: str) -> None:
         """Best-effort characteristic write.
@@ -215,7 +252,9 @@ class LagKingDevice(BluetoothDeviceBase):
         ball_data.good_shot = True
         ball_data.club = 'PT'
         # Recover launch speed from the gate reading, then m/s -> mph.
-        launch_mps = self.launch_speed_mps(speed_mps, self._surface_stimp)
+        launch_mps = self.launch_speed_mps(
+            speed_mps, self._surface_stimp, self._setup_distance_ft
+        )
         ball_data.speed = round(launch_mps * METERS_PER_S_TO_MPH, 2)
         # HLA: degrees, positive = right of target (matches GSPro).
         # Hide the value if the gate didn't have a confident angle read —

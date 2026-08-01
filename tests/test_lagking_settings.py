@@ -157,6 +157,41 @@ def main():
     check('a settings file predating the lagking block still loads',
           hasattr(legacy, 'system'), legacy.system)
 
+    # --- launch-speed recovery maths ---------------------------------------
+    # Imported late: it needs QtBluetooth, which PySide6-Essentials may lack.
+    try:
+        from src.bluetooth.lagking_device import LagKingDevice
+    except ImportError as e:
+        print(f'skip  launch-speed maths (QtBluetooth unavailable: {e})')
+        print(f'\n{_passed} checks passed')
+        return
+
+    ls = LagKingDevice.launch_speed_mps
+    check('launch speed always scales UP', ls(2.40, 10.0) > 2.40,
+          f'{ls(2.40, 10.0):.4f}')
+    check('a slower surface gets a bigger uplift',
+          ls(2.40, 8.0) > ls(2.40, 13.0),
+          f'{ls(2.40, 8.0):.4f} > {ls(2.40, 13.0):.4f}')
+
+    # Rolling the recovered speed must cover the roll seen at the gate PLUS
+    # the setup distance -- that is the whole derivation.
+    def roll(v, stimp):
+        return stimp * (v / LagKingDevice.STIMP_REF_SPEED_MPS) ** \
+            LagKingDevice.STIMP_ROLLOUT_EXPONENT
+
+    for stimp in (7.0, 10.0, 14.0):
+        for setup in (1.5, 2.0, 3.0):
+            got = roll(ls(2.40, stimp, setup), stimp)
+            want = roll(2.40, stimp) + setup
+            check(f'round-trip stimp={stimp} setup={setup}',
+                  abs(got - want) < 1e-6, f'{got:.6f} vs {want:.6f}')
+
+    check('a non-positive setup distance falls back to the default',
+          abs(ls(2.40, 10.0, 0.0) - ls(2.40, 10.0,
+              LagKingDevice.SETUP_DISTANCE_FT_DEFAULT)) < 1e-12)
+    check('degenerate inputs pass through untouched',
+          ls(0.0, 10.0) == 0.0 and ls(2.40, 0.0) == 2.40)
+
     print(f'\n{_passed} checks passed')
 
 
