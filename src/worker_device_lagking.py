@@ -34,6 +34,19 @@ class WorkerDeviceLagKing(WorkerBase):
         self.name = 'WorkerDeviceLagKing'
         self._scanner: BluetoothDeviceScanner | None = None
         self._device: LagKingDevice | None = None
+        self._surface_stimp = 10.0
+        self._speed_calibration = 1.0
+
+    def apply_settings(self, surface_stimp: float, speed_calibration: float) -> None:
+        """Push Putting Settings down to the live device (if any).
+
+        Called on construction and again whenever the settings form saves,
+        so a stimp change takes effect without reconnecting the gate.
+        """
+        self._surface_stimp = surface_stimp
+        self._speed_calibration = speed_calibration
+        if self._device is not None:
+            self._device.apply_settings(surface_stimp, speed_calibration)
 
     def run(self) -> None:
         self.started.emit()
@@ -55,6 +68,7 @@ class WorkerDeviceLagKing(WorkerBase):
     def _on_device_found(self, device: QBluetoothDeviceInfo) -> None:
         logging.debug(f'LagKing gate found: {device.name()}')
         self._device = LagKingDevice(device)
+        self._device.apply_settings(self._surface_stimp, self._speed_calibration)
         self._device.shot.connect(self.shot.emit)
         self._device.connected.connect(lambda msg: self.connected.emit(msg))
         self._device.disconnected.connect(self._on_device_disconnected)

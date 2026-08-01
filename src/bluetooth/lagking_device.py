@@ -54,7 +54,44 @@ class LagKingDevice(BluetoothDeviceBase):
     SIGNED_PUTT_NOTIFICATION_SIZE = 47
     FLAG_SIGNED = 0x80
 
+    # All three mirror the gate firmware's config.h. Roll-out is empirically
+    # ~v^1.5, NOT the textbook v^2 -- inverting it uses 1/1.5, not 1/2.
+    STIMP_REF_SPEED_MPS = 1.83
+    STIMP_ROLLOUT_EXPONENT = 1.5
+    SETUP_DISTANCE_FT = 2.0
+
+    @classmethod
+    def launch_speed_mps(cls, measured_mps: float, surface_stimp: float) -> float:
+        """Recover speed at the putter from speed measured at the gate.
+
+        GSPro, like any launch monitor consumer, wants ball speed AT LAUNCH.
+        The gate sits ~2 ft downrange, so by the time the ball is measured the
+        surface has already taken some speed out of it -- and how much depends
+        on the surface. A slow mat eats more of it than a fast one, so sending
+        the raw reading under-reports launch speed, and under-reports it
+        unevenly across surfaces.
+
+        Roll-out goes as `stimp * (v / v_ref) ** 1.5`, so total roll from the
+        putter is the roll still remaining at the gate plus the 2 ft already
+        travelled. Inverting that for the speed which would have produced it:
+
+            v_launch = v_ref * ((v/v_ref) ** 1.5 + setup_ft / stimp) ** (1/1.5)
+
+        Note this always scales UP, by roughly 7-11%, and more on a slower
+        surface. Nothing here depends on the green GSPro is simulating -- that
+        is GSPro's to model, and it applies its own green speed to what we send.
+        """
+        if measured_mps <= 0.0 or surface_stimp <= 0.01:
+            return measured_mps
+        remaining = (measured_mps / cls.STIMP_REF_SPEED_MPS) ** cls.STIMP_ROLLOUT_EXPONENT
+        total = remaining + (cls.SETUP_DISTANCE_FT / surface_stimp)
+        return cls.STIMP_REF_SPEED_MPS * (total ** (1.0 / cls.STIMP_ROLLOUT_EXPONENT))
+
     def __init__(self, device: QBluetoothDeviceInfo):
+        # Overwritten by apply_settings() before any putt arrives; these are
+        # only the fallbacks if the settings push were ever missed.
+        self._surface_stimp = 10.0
+        self._speed_calibration = 1.0
         self._services = []
         self._primary_service: BluetoothDeviceService = BluetoothDeviceService(
             device,
@@ -75,6 +112,12 @@ class LagKingDevice(BluetoothDeviceBase):
             LagKingDevice.HEARTBEAT_INTERVAL,
             LagKingDevice.DEVICE_HEARTBEAT_INTERVAL,
         )
+
+    def apply_settings(self, surface_stimp: float, speed_calibration: float) -> None:
+        if surface_stimp and surface_stimp > 0.01:
+            self._surface_stimp = float(surface_stimp)
+        if speed_calibration and speed_calibration > 0.01:
+            self._speed_calibration = float(speed_calibration)
 
     def _data_handler(
         self, characteristic: QLowEnergyCharacteristic, data: QByteArray
@@ -114,8 +157,12 @@ class LagKingDevice(BluetoothDeviceBase):
         ball_data.putt_type = PuttType.LAGKING
         ball_data.good_shot = True
         ball_data.club = 'PT'
-        # Ball speed: m/s on the wire, mph in BallData / GSPro JSON.
-        ball_data.speed = round(speed_mps * METERS_PER_S_TO_MPH, 2)
+        # Recover launch speed from the gate reading, apply the user's
+        # calibration trim, then convert m/s -> mph for GSPro.
+        launch_mps = self.launch_speed_mps(speed_mps, self._surface_stimp)
+        ball_data.speed = round(
+            launch_mps * self._speed_calibration * METERS_PER_S_TO_MPH, 2
+        )
         # HLA: degrees, positive = right of target (matches GSPro).
         # Hide the value if the gate didn't have a confident angle read —
         # default to 0 (straight) rather than passing noise through.

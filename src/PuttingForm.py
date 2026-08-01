@@ -5,7 +5,10 @@ from threading import Event
 import cv2
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QShowEvent
-from PySide6.QtWidgets import QWidget, QMessageBox, QProgressDialog
+from PySide6.QtWidgets import (
+    QWidget, QMessageBox, QProgressDialog, QGroupBox, QVBoxLayout,
+    QHBoxLayout, QLabel, QDoubleSpinBox,
+)
 
 from src.PuttingForm_ui import Ui_PuttingForm
 from src.RoisExPuttForm import RoisExPuttForm
@@ -26,11 +29,59 @@ class PuttingForm(QWidget, Ui_PuttingForm):
         self.settings.load()
         self.rois_form = RoisExPuttForm(main_window=self.main_window)
         self.setupUi(self)
+        self.__build_lagking_group()
         self.__setup_ui()
         self.close_button.clicked.connect(self.__close)
         self.save_button.clicked.connect(self.__save)
         self.rois_button.clicked.connect(self.__rois)
         self.find_video_sources_button.clicked.connect(self.__find_video_sources)
+
+    def __build_lagking_group(self):
+        """Build the LagKing settings box in code.
+
+        Deliberately NOT added to PuttingForm.ui: that would also require
+        regenerating PuttingForm_ui.py with pyside6-uic, and a hand-edited
+        generated file is how you ship a startup AttributeError. Built here
+        it cannot desync from the .ui, and it survives a future re-run of
+        uic untouched. Inserted at index 0 so LagKing sits above the ExPutt
+        and Webcam boxes, matching its position in the system dropdown.
+        """
+        box = QGroupBox('LagKing Settings', self)
+        outer = QVBoxLayout(box)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel('Putting surface stimp', box))
+        self.lagking_surface_stimp_spin = QDoubleSpinBox(box)
+        self.lagking_surface_stimp_spin.setRange(5.0, 15.0)
+        self.lagking_surface_stimp_spin.setSingleStep(0.5)
+        self.lagking_surface_stimp_spin.setDecimals(1)
+        self.lagking_surface_stimp_spin.setToolTip(
+            'Stimp of the mat or turf you are actually putting on. The gate\n'
+            'reads speed about 2 ft after impact, so some speed is already\n'
+            'gone by then -- more on a slow surface. This recovers the speed\n'
+            'at the putter, which is what GSPro expects. GSPro applies its\n'
+            'own green speed to the result; that is not set here.'
+        )
+        row.addWidget(self.lagking_surface_stimp_spin)
+        row.addStretch(1)
+        outer.addLayout(row)
+
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel('Speed calibration', box))
+        self.lagking_speed_calibration_spin = QDoubleSpinBox(box)
+        self.lagking_speed_calibration_spin.setRange(0.50, 1.50)
+        self.lagking_speed_calibration_spin.setSingleStep(0.01)
+        self.lagking_speed_calibration_spin.setDecimals(2)
+        self.lagking_speed_calibration_spin.setToolTip(
+            'Fine trim on top of the stimp correction. 1.00 = model only.\n'
+            'Putt a known distance and compare against GSPro: raise this if\n'
+            'putts finish short, lower it if they run long.'
+        )
+        row2.addWidget(self.lagking_speed_calibration_spin)
+        row2.addStretch(1)
+        outer.addLayout(row2)
+
+        self.verticalLayout.insertWidget(0, box)
 
     def __setup_ui(self):
         self.putting_system_combo.clear()
@@ -63,6 +114,9 @@ class PuttingForm(QWidget, Ui_PuttingForm):
         self.close()
 
     def __load_values(self):
+        lagking = getattr(self.settings, 'lagking', {}) or {}
+        self.lagking_surface_stimp_spin.setValue(float(lagking.get('surface_stimp', 10.0)))
+        self.lagking_speed_calibration_spin.setValue(float(lagking.get('speed_calibration', 1.0)))
         self.webcam_camera_combo.setCurrentText(str(self.settings.webcam['camera']))
         self.webcam_ball_color_combo.setCurrentText(self.settings.webcam['ball_color'])
         self.webcam_auto_start_combo.setCurrentText(self.settings.webcam['auto_start'])
@@ -84,6 +138,10 @@ class PuttingForm(QWidget, Ui_PuttingForm):
             self.settings.webcam['window_name'] = self.webcam_window_title_edit.toPlainText()
             self.settings.webcam['width'] = self.webcam_putting_width_edit.toPlainText()
             self.settings.system = self.putting_system_combo.currentText()
+            if not isinstance(getattr(self.settings, 'lagking', None), dict):
+                self.settings.lagking = {}
+            self.settings.lagking['surface_stimp'] = self.lagking_surface_stimp_spin.value()
+            self.settings.lagking['speed_calibration'] = self.lagking_speed_calibration_spin.value()
             #self.settings.exputt['camera'] = int(self.exputt_capture_card_combo.currentText())
             self.settings.webcam['params'] = self.ball_tracking_app_params_edit.toPlainText()
             self.settings.exputt['window_name'] = self.exputt_camera_window_title_edit.toPlainText()

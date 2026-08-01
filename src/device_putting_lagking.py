@@ -16,6 +16,28 @@ class DevicePuttingLagKing(DevicePuttingBase):
         DevicePuttingBase.__init__(self, main_window)
         self.device_worker = WorkerDeviceLagKing()
         self.setup()
+        self.__push_settings()
+
+    def __push_settings(self):
+        """Copy Putting Settings into the worker.
+
+        Read with .get() defaults so a settings file written before these
+        keys existed (an upstream install, or an older build of this fork)
+        loads instead of raising KeyError on the startup path.
+        """
+        lagking = getattr(self.main_window.putting_settings, 'lagking', {}) or {}
+        try:
+            surface_stimp = float(lagking.get('surface_stimp', 10.0))
+            calibration = float(lagking.get('speed_calibration', 1.0))
+        except (TypeError, ValueError):
+            surface_stimp, calibration = 10.0, 1.0
+        self.device_worker.apply_settings(surface_stimp, calibration)
+
+    def reload_putting_rois(self):
+        # Base hook fired whenever Putting Settings are saved -- re-push so a
+        # stimp change takes effect without reconnecting the gate.
+        super().reload_putting_rois()
+        self.__push_settings()
 
     def setup_device_thread(self):
         super().setup_device_thread()

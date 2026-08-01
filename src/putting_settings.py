@@ -64,7 +64,18 @@ class PuttingSettings(SettingsBase):
                     # exactly "LagKing V3" — the prefix match means future
                     # versions / multiple gates will keep working without
                     # a settings change.
-                    "device_name_prefix": "LagKing"
+                    "device_name_prefix": "LagKing",
+                    # Stimp of the surface the player is ACTUALLY putting on.
+                    # The gate reads ball speed ~2 ft downrange, by which point
+                    # the surface has already slowed the ball; how much depends
+                    # on this number. Used to recover true launch speed, which
+                    # is what GSPro expects from a launch monitor. GSPro owns
+                    # the green being simulated -- that is not our business.
+                    "surface_stimp": 10.0,
+                    # Empirical trim applied after the launch-speed recovery.
+                    # 1.0 = model only. Raise if putts finish short in GSPro,
+                    # lower if they run long. Calibrate with a tape measure.
+                    "speed_calibration": 1.0
                 }
             }
         )
