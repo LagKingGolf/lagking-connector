@@ -6,6 +6,7 @@ from src.settings_base import SettingsBase
 class PuttingSystems:
     EXPUTT = 'ExPutt'
     WEBCAM = 'Webcam'
+    LAGKING = 'LagKing'
     NONE = 'None'
 
 @dataclass
@@ -51,6 +52,14 @@ class PuttingSettings(SettingsBase):
                     },
                     "auto_start": "Yes",
                     "rois": {}
+                },
+                "lagking": {
+                    # The connector auto-scans for any peripheral whose name
+                    # starts with this prefix. V3 firmware advertises
+                    # exactly "LagKing V3" — the prefix match means future
+                    # versions / multiple gates will keep working without
+                    # a settings change.
+                    "device_name_prefix": "LagKing"
                 }
             }
         )

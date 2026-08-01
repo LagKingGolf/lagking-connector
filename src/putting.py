@@ -1,4 +1,5 @@
 from src.device_putting_exputt import DevicePuttingExPutt
+from src.device_putting_lagking import DevicePuttingLagKing
 from src.device_putting_webcam import DevicePuttingWebcam
 from src.putting_settings import PuttingSystems
 
@@ -15,6 +16,8 @@ class Putting:
             self.putting_device = DevicePuttingWebcam(self.main_window)
         elif self.main_window.putting_settings.system == PuttingSystems.EXPUTT:
             self.putting_device = DevicePuttingExPutt(self.main_window)
+        elif self.main_window.putting_settings.system == PuttingSystems.LAGKING:
+            self.putting_device = DevicePuttingLagKing(self.main_window)
         else:
             self.putting_device = None
         self.__display_putting_system()

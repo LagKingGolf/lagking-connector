@@ -1,5 +1,35 @@
-# MLM2PRO-GSPro-Connector
-GSPro connector for the MLM2Pro & Mevo+ Launch Monitors that includes Webcam or ExPutt putting.
+# MLM2PRO-GSPro-Connector (LagKing fork)
+GSPro connector for the MLM2Pro & Mevo+ Launch Monitors that includes Webcam, ExPutt, or **LagKing** putting.
+
+## LagKing fork
+
+This fork adds a third putting input alongside Webcam and ExPutt: the **LagKing V3**
+gate (https://lagking.com), a dual-laser break-beam putting device that
+publishes ball speed and start-line angle over BLE GATT.
+
+To use the LagKing input:
+
+1. Power on your LagKing V3 gate.
+2. Pair it from Windows Bluetooth settings (the gate advertises as
+   `LagKing V3`). The connector uses Qt's BLE stack, which on Windows
+   requires the device to already be paired in the OS.
+3. Open the connector's Putting Settings dialog and select **LagKing** from
+   the Putting System dropdown. Save and start putting.
+
+The connector auto-scans for any peripheral whose name starts with
+`LagKing`, connects, subscribes to the gate's putt-notification
+characteristic, and forwards each putt to GSPro as a `BallData` payload
+(speed in mph, HLA in degrees, VLA / spin zeroed). Disconnect / re-scan
+is automatic when the gate goes out of range and back.
+
+LagKing-specific files:
+- `src/bluetooth/lagking_device.py` — BLE peripheral wrapper, parses the
+  gate's 29-byte putt notification.
+- `src/worker_device_lagking.py` — scan + connect + subscribe lifecycle.
+- `src/device_putting_lagking.py` — DevicePuttingBase wrapper for the worker.
+- Plus single-line additions in `ball_data.py` (PuttType.LAGKING),
+  `putting_settings.py` (PuttingSystems.LAGKING + lagking config block),
+  `putting.py` (device dispatch), and `PuttingForm.py` (system combo entry).
 
 ## Support me:
 Any support greatly appreciated and will help me to continue to develop this connector.
