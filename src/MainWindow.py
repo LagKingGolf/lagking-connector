@@ -221,7 +221,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.gspro_connection.connect_to_gspro()
 
     def __about(self):
-        QMessageBox.information(self, "About", f"{MainWindow.app_name}\nVersion: {MainWindow.version}")
+        QMessageBox.information(
+            self, "About",
+            f"{MainWindow.app_name}\nVersion: {MainWindow.version}\n\n"
+            "A modified version of springbok's MLM2PRO-GSPro-Connector, "
+            "licensed GPL-3.0.\nModified by LagKing, 2026-08-01. springbok is "
+            "not affiliated with\nLagKing and does not endorse this fork.\n\n"
+            "Source: https://github.com/LagKingGolf/lagking-connector"
+        )
 
     def log_message(self, message_types, message_system, message):
         self.__add_log_row(

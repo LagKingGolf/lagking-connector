@@ -121,11 +121,28 @@ class LagKingDevice(BluetoothDeviceBase):
         self._primary_service: BluetoothDeviceService = BluetoothDeviceService(
             device,
             LagKingDevice.SERVICE_UUID,
-            [LagKingDevice.PUTT_CHAR_UUID, LagKingDevice.BATTERY_CHAR_UUID],
+            [LagKingDevice.PUTT_CHAR_UUID],
             self._data_handler,
             None,
         )
         self._services.append(self._primary_service)
+        # Battery gets its OWN service object rather than sharing the primary
+        # subscribe list. BluetoothDeviceService.subscribe_to_notifications
+        # RETURNS on the first characteristic it cannot subscribe to -- before
+        # emitting notifications_subscribed. So a battery failure on the shared
+        # list would silently skip _on_subscribed entirely: no CLIENT_KIND write
+        # (leaving the gate on the 1-minute phone sleep timeout), no setup
+        # distance pushed, and never reporting Connected -- while putts kept
+        # arriving. A status line must not be able to take the identify
+        # handshake down with it.
+        self._battery_service: BluetoothDeviceService = BluetoothDeviceService(
+            device,
+            LagKingDevice.SERVICE_UUID,
+            [LagKingDevice.BATTERY_CHAR_UUID],
+            self._data_handler,
+            None,
+        )
+        self._services.append(self._battery_service)
         # As soon as we're subscribed the device is considered ready —
         # no auth handshake to complete.
         self._primary_service.notifications_subscribed.connect(

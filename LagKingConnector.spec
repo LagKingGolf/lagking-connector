@@ -1,11 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
+import glob
 
 
 a = Analysis(
     ['LagKingConnector.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    # OCR language data for the screenshot launch monitors -- without these
+    # bundled, every screenshot-based monitor is dead in the built exe. Plus
+    # LICENSE and README so the binary carries its licence, the GPLv3 5(a)
+    # modification notice, and the source location.
+    datas=[(f, '.') for f in glob.glob('*.traineddata')]
+          + [('LICENSE', '.'), ('README.md', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

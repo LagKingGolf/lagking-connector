@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import cv2
 import numpy as np
 import pyqtgraph as pg
@@ -9,6 +10,19 @@ from pyqtgraph import ViewBox
 from src.ball_data import BallData, BallMetrics
 from src.labeled_roi import LabeledROI
 from src.settings import LaunchMonitor
+
+
+
+def tessdata_dir() -> str:
+    """Directory holding the .traineddata files.
+
+    NOT the CWD. The old path='.\\' resolved against the process working
+    directory, so a frozen exe launched from a shortcut (or from anywhere but
+    its own folder) found no language data and every screenshot-based launch
+    monitor failed. sys._MEIPASS is PyInstaller's unpack dir when frozen;
+    otherwise fall back to the directory the entry script lives in.
+    """
+    return getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.argv[0])))
 
 
 class ScreenshotBase(ViewBox):
@@ -193,7 +207,7 @@ class ScreenshotBase(ViewBox):
                 train_file = 'voicecaddiesc4'
 
         logging.debug(f"Using {train_file}.traineddata for OCR")
-        tesserocr_api = tesserocr.PyTessBaseAPI(psm=tesserocr.PSM.SINGLE_WORD, lang=train_file, path='.\\')
+        tesserocr_api = tesserocr.PyTessBaseAPI(psm=tesserocr.PSM.SINGLE_WORD, lang=train_file, path=tessdata_dir())
         try:
             pil_img = Image.fromarray(self.screenshot_image).convert('RGB')
             sc = np.array(pil_img)
@@ -248,7 +262,7 @@ class ScreenshotBase(ViewBox):
                 if conf <= 0:
                     logging.debug(f'ocr {roi} confidence <= 0 retrying with RAW_LINE')
                     if fallback_tesserocr_api is None:
-                        fallback_tesserocr_api = tesserocr.PyTessBaseAPI(psm=tesserocr.PSM.RAW_LINE, lang=train_file, path='.\\')
+                        fallback_tesserocr_api = tesserocr.PyTessBaseAPI(psm=tesserocr.PSM.RAW_LINE, lang=train_file, path=tessdata_dir())
                     fallback_tesserocr_api.SetImage(img)
                     ocr_result = fallback_tesserocr_api.GetUTF8Text()
                     conf = fallback_tesserocr_api.MeanTextConf()

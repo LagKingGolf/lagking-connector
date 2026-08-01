@@ -59,12 +59,17 @@ LagKing-specific files:
   `putting_settings.py` (PuttingSystems.LAGKING + lagking config block),
   `putting.py` (device dispatch), and `PuttingForm.py` (system combo entry).
 
-## Support me:
-Any support greatly appreciated and will help me to continue to develop this connector.
+## Support springbok, the upstream author
+
+Almost all of this connector is springbok's work. The link below goes to
+**springbok**, not to LagKing — if this tool is useful to you, that is where
+support belongs.
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/X8X3OXE0L)
 
-If you are looking at a GSPro control box for your simulator, please consider my Brain Box it has some very unique features.
+springbok also sells a GSPro control box, the Brain Box, which has some very
+unique features. It is springbok's product; LagKing has no involvement in it
+and takes nothing from it.
 
 [![Brain Box](images/brain_box.jpg)](https://cascadia3dpd.com/product/brain-box-golf-simulator-control-box-for-gspro/)
 
@@ -97,7 +102,10 @@ We are excited to announce support for the Mevo+ launch monitor has now been add
 
 For more details see [here](https://github.com/springbok/MLM2PRO-GSPro-Connector/wiki/Mevo-)
 
-## Highlights:
+## Highlights
+
+*The rest of this README is upstream's own documentation of the connector,
+written by springbok. First-person statements below are theirs.*
 
 This connector was built from the ground up to be easy to use, reliable, accurate, and fast.
 
