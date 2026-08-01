@@ -32,6 +32,24 @@ py -3.12 -m venv .venv
 .venv\Scripts\python LagKingConnector.py
 ```
 
+### ⚠️ Rapsodo MLM2PRO Bluetooth does not work from a source build
+
+`Rapsodo MLM2PRO BT` decrypts a Rapsodo web-API secret via
+`src/bluetooth/mlm2pro_secret.py`, which upstream gitignores (`.gitignore:168`)
+because it holds a vendor key. It is therefore absent from every clone, and no
+source build can use that path. Selecting it reports the missing key rather
+than crashing, but it will not connect.
+
+This is upstream's decision, not something this fork broke or can fix. MLM2PRO
+owners building from source can use the `Rapsodo MLM2PRO` entry instead, which
+takes a different route: mirror the phone's Rapsodo Range display to the PC and
+the connector reads that window. Every other launch monitor, and LagKing
+putting, are unaffected.
+
+Note the two MLM2PRO entries are genuinely different mechanisms, not a
+preference — `MLM2PRO` is the phone-mirror route, `MLM2PRO BT` is direct
+Bluetooth.
+
 ### Bluetooth
 
 Pair the gate in Windows Bluetooth settings first. Many desktop sim PCs have no
