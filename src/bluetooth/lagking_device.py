@@ -1,4 +1,4 @@
-# LagKing V3 BLE peripheral — putting-only input for the GSPro connector.
+# LagKing BLE peripheral — putting-only input for the GSPro connector.
 #
 # The gate publishes putt data on a single notification characteristic
 # (PUTT_CHAR_UUID) under SERVICE_UUID. Each notification is a 29-byte
@@ -14,14 +14,11 @@
 #   float targetDistFt  offset 24
 #   uint8 flags         offset 28    (bit 0 = hasAngle, bit 7 = signed)
 #
-# Source of truth for layout:
-#   product/v3/firmware/ble_service.cpp ble_notifyPutt()
-#   app/LagKing/src/ble/BleProtocol.ts  parsePuttNotification()
+# Layout is fixed by the gate firmware; treat it as the wire contract.
 #
 # No bonding / no encryption / no auth handshake — connect, subscribe,
-# read notifications. Everything else (battery, beam-debug, settings
-# writes) is exposed by the firmware but irrelevant to GSPro and we
-# leave those characteristics alone.
+# read notifications. The gate exposes further characteristics that are
+# irrelevant to GSPro; we leave those alone.
 
 import logging
 import struct
@@ -145,8 +142,7 @@ class LagKingDevice(BluetoothDeviceBase):
         # Identify as a connector BEFORE anything else. ble_appClientConnected()
         # in the firmware treats any peer that has NOT written this as a phone,
         # and picks the 1-minute app soft-sleep timeout accordingly -- so the
-        # gate would sleep mid-hole with its rear emitters off and swallow the
-        # putt that woke it.
+        # gate would sleep mid-hole and swallow the putt that woke it.
         self._write(
             LagKingDevice.CLIENT_KIND_CHAR_UUID,
             bytearray([LagKingDevice.CLIENT_KIND_CONNECTOR]),

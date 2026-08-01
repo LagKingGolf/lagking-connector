@@ -31,16 +31,16 @@ Complete corresponding source is this repository.
 
 ## LagKing putting input
 
-This fork adds a third putting input alongside Webcam and ExPutt: the **LagKing V3**
-gate (https://lagking.com), a dual-laser break-beam putting device that
-publishes ball speed and start-line angle over BLE GATT.
+This fork adds a third putting input alongside Webcam and ExPutt: the
+**LagKing** putting gate ([lagking.com](https://lagking.com)), which measures
+ball speed and start line and publishes them over BLE.
 
 To use the LagKing input:
 
-1. Power on your LagKing V3 gate.
-2. Pair it from Windows Bluetooth settings (the gate advertises as
-   `LagKing V3`). The connector uses Qt's BLE stack, which on Windows
-   requires the device to already be paired in the OS.
+1. Power on your LagKing gate.
+2. Pair it from Windows Bluetooth settings (it advertises with a name starting
+   `LagKing`). The connector uses Qt's BLE stack, which on Windows requires the
+   device to already be paired in the OS.
 3. Open the connector's Putting Settings dialog and select **LagKing** from
    the Putting System dropdown. Save and start putting.
 
