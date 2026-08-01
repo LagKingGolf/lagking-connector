@@ -1,10 +1,11 @@
 import logging
 import os
+import sys
 import webbrowser
 from dataclasses import dataclass
 from datetime import datetime
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QShowEvent, QFont, QColor, QPalette
+from PySide6.QtGui import QShowEvent, QFont, QColor, QPalette, QIcon
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QTableWidgetItem, QTextEdit, QHBoxLayout
 from src.SettingsForm import SettingsForm
 from src.MainWindow_ui import Ui_MainWindow
@@ -63,6 +64,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.putting_settings_form = PuttingForm(main_window=self)
         self.putting = Putting(main_window=self)
         self.setWindowTitle(f"{MainWindow.app_name} {MainWindow.version}")
+        # Overridden at runtime rather than by hand-editing the generated
+        # MainWindow_ui.py, whose icon comes from a compiled Qt resource
+        # (:/ico/ico/connect.ico). Same approach as the title above.
+        icon_path = os.path.join(
+            getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(sys.argv[0]))),
+            'images', 'lagking.ico',
+        )
+        if os.path.isfile(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         self.__setup_ui()
         self.__auto_start()
 

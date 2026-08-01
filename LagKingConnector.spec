@@ -11,7 +11,8 @@ a = Analysis(
     # LICENSE and README so the binary carries its licence, the GPLv3 5(a)
     # modification notice, and the source location.
     datas=[(f, '.') for f in glob.glob('*.traineddata')]
-          + [('LICENSE', '.'), ('README.md', '.')],
+          + [('LICENSE', '.'), ('README.md', '.'),
+             ('images/lagking.ico', 'images')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -29,6 +30,7 @@ exe = EXE(
     a.datas,
     [],
     name='LagKingConnector',
+    icon='images/lagking.ico',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
