@@ -41,6 +41,8 @@ class LagKingDevice(BluetoothDeviceBase):
     """BLE peripheral wrapper for the LagKing V3 putting gate."""
 
     putt_received = Signal(BallData)
+    # soc percent, charging (USB present). -1 percent = gate did not say.
+    battery_update = Signal(int, bool)
 
     # Drives the on-green keepalive (see _heartbeat). 30 s sits comfortably
     # inside the gate's 5-minute connector soft-sleep window even if a couple
@@ -57,6 +59,10 @@ class LagKingDevice(BluetoothDeviceBase):
     # READ|WRITE float: distance from the ball's start to the gate. The gate
     # makes this user-configurable, so it must be read, not assumed.
     SETUP_DISTANCE_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8127}'))
+    # NOTIFY. Packed: float volts, uint8 soc%, uint8 charging, float raw,
+    # uint8 dev-override. Append-only in the firmware, so read a PREFIX and
+    # never assume the total length.
+    BATTERY_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8101}'))
 
     # Value the gate expects on CLIENT_KIND to classify us as a connector
     # rather than a phone. Load-bearing: without it the gate applies the
@@ -112,14 +118,15 @@ class LagKingDevice(BluetoothDeviceBase):
         # only the fallback if the settings push were ever missed.
         self._surface_stimp = 10.0
         self._setup_distance_ft = LagKingDevice.SETUP_DISTANCE_FT_DEFAULT
+        self._last_battery = None
         self._on_green = False
         self._services = []
         self._primary_service: BluetoothDeviceService = BluetoothDeviceService(
             device,
             LagKingDevice.SERVICE_UUID,
-            [LagKingDevice.PUTT_CHAR_UUID],
+            [LagKingDevice.PUTT_CHAR_UUID, LagKingDevice.BATTERY_CHAR_UUID],
             self._data_handler,
-            self._read_handler,
+            None,
         )
         self._services.append(self._primary_service)
         # As soon as we're subscribed the device is considered ready —
@@ -145,33 +152,8 @@ class LagKingDevice(BluetoothDeviceBase):
             bytearray([LagKingDevice.CLIENT_KIND_CONNECTOR]),
             'client-kind',
         )
-        # The gate makes setup distance user-configurable, so read the live
-        # value rather than assuming the 2.0 ft default -- a wrong value here
-        # biases every putt slightly, in a way nobody would spot.
-        try:
-            self._primary_service.read_characteristic(
-                LagKingDevice.SETUP_DISTANCE_CHAR_UUID
-            )
-        except Exception as e:
-            logging.debug(f'LagKing setup-distance read failed: {e}')
+        self._push_setup_distance()
         self.launch_monitor_connected.emit()
-
-    def _read_handler(self, characteristic, data) -> None:
-        """Only the setup distance is read; anything else is ignored."""
-        if characteristic.uuid() != LagKingDevice.SETUP_DISTANCE_CHAR_UUID:
-            return
-        raw = bytes(data.data() if hasattr(data, 'data') else data)
-        if len(raw) < 4:
-            return
-        try:
-            (value,) = struct.unpack_from('<f', raw, 0)
-        except Exception:
-            return
-        # Clamped to the firmware's own accepted band; a garbage read must
-        # not silently skew the speed correction.
-        if 0.1 <= value <= 20.0:
-            self._setup_distance_ft = float(value)
-            logging.debug(f'LagKing setup distance from gate: {value:.2f} ft')
 
     def _write(self, uuid: QBluetoothUuid, data: bytearray, what: str) -> None:
         """Best-effort characteristic write.
@@ -209,14 +191,36 @@ class LagKingDevice(BluetoothDeviceBase):
         if self._on_green:
             self._write(LagKingDevice.WAKE_CHAR_UUID, bytearray([1]), 'wake')
 
-    def apply_settings(self, surface_stimp: float) -> None:
+    def apply_settings(self, surface_stimp: float,
+                       setup_distance_ft: float | None = None) -> None:
         if surface_stimp and surface_stimp > 0.01:
             self._surface_stimp = float(surface_stimp)
+        if setup_distance_ft and setup_distance_ft > 0.01:
+            self._setup_distance_ft = float(setup_distance_ft)
+            self._push_setup_distance()
+
+    def _push_setup_distance(self) -> None:
+        """Tell the gate where the ball starts.
+
+        The connector owns this, not the gate: without the phone app the gate's
+        stored value is whatever was last set, possibly by a different user on a
+        different mat. Writing it down keeps the gate's own projection honest and
+        keeps our speed correction and the gate agreeing on one number.
+        """
+        self._write(
+            LagKingDevice.SETUP_DISTANCE_CHAR_UUID,
+            bytearray(struct.pack('<f', self._setup_distance_ft)),
+            'setup-distance',
+        )
 
     def _data_handler(
         self, characteristic: QLowEnergyCharacteristic, data: QByteArray
     ) -> None:
-        if characteristic.uuid() != LagKingDevice.PUTT_CHAR_UUID:
+        uuid = characteristic.uuid()
+        if uuid == LagKingDevice.BATTERY_CHAR_UUID:
+            self._handle_battery(bytes(data.data()))
+            return
+        if uuid != LagKingDevice.PUTT_CHAR_UUID:
             return
         payload = bytes(data.data())
         if len(payload) < LagKingDevice.PUTT_NOTIFICATION_SIZE:
@@ -238,6 +242,21 @@ class LagKingDevice(BluetoothDeviceBase):
         # connector wires into the GSPro send path for launch monitors.
         # Mirror onto it so callers can use either.
         self.shot.emit(ball_data)
+
+    def _handle_battery(self, payload: bytes) -> None:
+        # Prefix read: the firmware appends fields over time, so anything past
+        # the first six bytes is optional and must never be required.
+        if len(payload) < 6:
+            return
+        try:
+            _volts, soc, charging = struct.unpack_from('<fBB', payload, 0)
+        except Exception:
+            return
+        state = (int(soc), bool(charging))
+        if state == self._last_battery:
+            return                      # notifies every ~30 s; only report changes
+        self._last_battery = state
+        self.battery_update.emit(state[0], state[1])
 
     def _parse_putt(self, payload: bytes) -> BallData | None:
         # 7 little-endian floats + uint8 flags.

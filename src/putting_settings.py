@@ -71,7 +71,13 @@ class PuttingSettings(SettingsBase):
                     # on this number. Used to recover true launch speed, which
                     # is what GSPro expects from a launch monitor. GSPro owns
                     # the green being simulated -- that is not our business.
-                    "surface_stimp": 10.0
+                    "surface_stimp": 10.0,
+                    # Distance from the ball's start to the gate. OWNED BY
+                    # THE CONNECTOR and written down to the gate on connect --
+                    # without the phone app the gate's stored value is stale,
+                    # so the connector is the source of truth. Firmware accepts
+                    # 1.0-5.0 ft (SETUP_DISTANCE_MIN/MAX_FT).
+                    "setup_distance_ft": 2.0
                 }
             }
         )

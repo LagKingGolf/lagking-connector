@@ -30,7 +30,11 @@ class DevicePuttingLagKing(DevicePuttingBase):
             surface_stimp = float(lagking.get('surface_stimp', 10.0))
         except (TypeError, ValueError):
             surface_stimp = 10.0
-        self.device_worker.apply_settings(surface_stimp)
+        try:
+            setup_distance = float(lagking.get('setup_distance_ft', 2.0))
+        except (TypeError, ValueError):
+            setup_distance = 2.0
+        self.device_worker.apply_settings(surface_stimp, setup_distance)
 
     def reload_putting_rois(self):
         # Base hook fired whenever Putting Settings are saved -- re-push so a

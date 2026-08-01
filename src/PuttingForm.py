@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QShowEvent
 from PySide6.QtWidgets import (
     QWidget, QMessageBox, QProgressDialog, QGroupBox, QVBoxLayout,
-    QHBoxLayout, QLabel, QDoubleSpinBox,
+    QHBoxLayout, QLabel, QDoubleSpinBox, QComboBox,
 )
 
 from src.PuttingForm_ui import Ui_PuttingForm
@@ -21,6 +21,10 @@ class PuttingForm(QWidget, Ui_PuttingForm):
 
     saved = Signal()
     cancel = Signal()
+
+    # The only setup distances the connector offers. Keep inside the
+    # firmware's SETUP_DISTANCE_MIN_FT..MAX_FT (1.0-5.0).
+    SETUP_DISTANCE_CHOICES_FT = (2.0, 2.5, 3.0)
 
     def __init__(self, main_window):
         super().__init__()
@@ -66,6 +70,27 @@ class PuttingForm(QWidget, Ui_PuttingForm):
         row.addStretch(1)
         outer.addLayout(row)
 
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel('Setup distance', box))
+        # Three fixed choices rather than a free spin box (Cole 2026-08-01):
+        # this is where you place the ball, not a measurement to dial in, and
+        # an arbitrary 3.7 ft only invites people to fiddle with a number that
+        # should match how they actually set up. Values live in
+        # SETUP_DISTANCE_CHOICES_FT; all sit inside the firmware's 1.0-5.0 band.
+        self.lagking_setup_distance_combo = QComboBox(box)
+        self.lagking_setup_distance_combo.addItems(
+            [f'{v:g} ft' for v in PuttingForm.SETUP_DISTANCE_CHOICES_FT]
+        )
+        self.lagking_setup_distance_combo.setToolTip(
+            'How far the ball sits BEHIND the gate when you address it.\n'
+            'The gate reads speed as the ball passes, so this is the stretch\n'
+            'over which the surface has already slowed it. The connector owns\n'
+            'this value and writes it down to the gate.'
+        )
+        row2.addWidget(self.lagking_setup_distance_combo)
+        row2.addStretch(1)
+        outer.addLayout(row2)
+
         self.verticalLayout.insertWidget(0, box)
 
     def __setup_ui(self):
@@ -101,6 +126,13 @@ class PuttingForm(QWidget, Ui_PuttingForm):
     def __load_values(self):
         lagking = getattr(self.settings, 'lagking', {}) or {}
         self.lagking_surface_stimp_spin.setValue(float(lagking.get('surface_stimp', 10.0)))
+        # Snap to the nearest offered choice: a settings file may carry a
+        # value from the old free-entry spin box, or from the phone app.
+        stored = float(lagking.get('setup_distance_ft', 2.0))
+        nearest = min(PuttingForm.SETUP_DISTANCE_CHOICES_FT,
+                      key=lambda v: abs(v - stored))
+        self.lagking_setup_distance_combo.setCurrentIndex(
+            PuttingForm.SETUP_DISTANCE_CHOICES_FT.index(nearest))
         self.webcam_camera_combo.setCurrentText(str(self.settings.webcam['camera']))
         self.webcam_ball_color_combo.setCurrentText(self.settings.webcam['ball_color'])
         self.webcam_auto_start_combo.setCurrentText(self.settings.webcam['auto_start'])
@@ -125,6 +157,9 @@ class PuttingForm(QWidget, Ui_PuttingForm):
             if not isinstance(getattr(self.settings, 'lagking', None), dict):
                 self.settings.lagking = {}
             self.settings.lagking['surface_stimp'] = self.lagking_surface_stimp_spin.value()
+            self.settings.lagking['setup_distance_ft'] = \
+                PuttingForm.SETUP_DISTANCE_CHOICES_FT[
+                    self.lagking_setup_distance_combo.currentIndex()]
             #self.settings.exputt['camera'] = int(self.exputt_capture_card_combo.currentText())
             self.settings.webcam['params'] = self.ball_tracking_app_params_edit.toPlainText()
             self.settings.exputt['window_name'] = self.exputt_camera_window_title_edit.toPlainText()

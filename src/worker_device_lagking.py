@@ -35,17 +35,21 @@ class WorkerDeviceLagKing(WorkerBase):
         self._scanner: BluetoothDeviceScanner | None = None
         self._device: LagKingDevice | None = None
         self._surface_stimp = 10.0
+        self._setup_distance_ft = 2.0
         self._on_green = False
 
-    def apply_settings(self, surface_stimp: float) -> None:
+    def apply_settings(self, surface_stimp: float,
+                       setup_distance_ft: float | None = None) -> None:
         """Push Putting Settings down to the live device (if any).
 
-        Called on construction and again whenever the settings form saves,
-        so a stimp change takes effect without reconnecting the gate.
+        Called on construction and again whenever the settings form saves, so a
+        stimp or setup-distance change takes effect without reconnecting.
         """
         self._surface_stimp = surface_stimp
+        if setup_distance_ft:
+            self._setup_distance_ft = setup_distance_ft
         if self._device is not None:
-            self._device.apply_settings(surface_stimp)
+            self._device.apply_settings(surface_stimp, self._setup_distance_ft)
 
     def run(self) -> None:
         self.started.emit()
@@ -66,8 +70,18 @@ class WorkerDeviceLagKing(WorkerBase):
 
     def _on_device_found(self, device: QBluetoothDeviceInfo) -> None:
         logging.debug(f'LagKing gate found: {device.name()}')
+        # Advertising RSSI, i.e. signal strength AT DISCOVERY. Qt's desktop LE
+        # API exposes no live RSSI once connected, so this is a connect-time
+        # reading and is reported as such rather than implying a live meter.
+        try:
+            rssi = device.rssi()
+        except Exception:
+            rssi = 0
+        if rssi:
+            self.status.emit('Signal', f'{rssi} dBm at connect ({self._signal_label(rssi)})')
         self._device = LagKingDevice(device)
-        self._device.apply_settings(self._surface_stimp)
+        self._device.battery_update.connect(self._on_battery)
+        self._device.apply_settings(self._surface_stimp, self._setup_distance_ft)
         # A gate that connects (or reconnects) mid-round must inherit the
         # club state we already know, or it sits awake/asleep incorrectly
         # until the player next changes club.
@@ -117,6 +131,25 @@ class WorkerDeviceLagKing(WorkerBase):
                 logging.debug(f'LagKing scanner stop error: {e}')
             self._scanner = None
         super().shutdown()
+
+    @staticmethod
+    def _signal_label(rssi: int) -> str:
+        # Rough bands for a BLE peripheral a few feet away on a sim mat. The
+        # gate needs its external antenna to reach the good end -- without one
+        # it sits around -85 dBm at a foot, which is the 'weak' band.
+        if rssi >= -60:
+            return 'strong'
+        if rssi >= -75:
+            return 'good'
+        if rssi >= -85:
+            return 'weak'
+        return 'very weak — check the antenna'
+
+    def _on_battery(self, soc: int, charging: bool) -> None:
+        if charging:
+            self.status.emit('Battery', f'charging (USB connected), {soc}%')
+        else:
+            self.status.emit('Battery', f'{soc}% on battery')
 
     def club_selected(self, club: str) -> None:
         """GSPro tells us the club; the putter means the player is on the green.

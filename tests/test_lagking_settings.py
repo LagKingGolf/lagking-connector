@@ -117,6 +117,15 @@ def main():
     check('no calibration widget',
           not hasattr(form, 'lagking_speed_calibration_spin'))
 
+    combo = getattr(form, 'lagking_setup_distance_combo', None)
+    check('setup distance is a dropdown, not free entry', combo is not None)
+    check('exactly three setup distances offered',
+          [combo.itemText(i) for i in range(combo.count())]
+          == ['2 ft', '2.5 ft', '3 ft'],
+          str([combo.itemText(i) for i in range(combo.count())]))
+    check('every choice is inside the firmware 1.0-5.0 ft band',
+          all(1.0 <= v <= 5.0 for v in PuttingForm.SETUP_DISTANCE_CHOICES_FT))
+
     # --- placement ---------------------------------------------------------
     # findChildren returns creation order, so assert LAYOUT order instead.
     boxes = []
@@ -141,12 +150,23 @@ def main():
     check('load populates the spin box from settings',
           abs(spin.value() - 12.5) < 1e-9, spin.value())
 
+    # A stored value that is not one of the three must snap to the nearest,
+    # not crash or silently reset -- an older settings file can hold 3.7.
+    settings.lagking['setup_distance_ft'] = 2.6
+    form._PuttingForm__load_values()
+    check('an off-list setup distance snaps to the nearest choice',
+          combo.currentText() == '2.5 ft', combo.currentText())
+
     spin.setValue(8.5)
+    combo.setCurrentIndex(2)
     form._PuttingForm__save()
     reloaded = PuttingSettings(_FakePaths(tmp))
     check('save round-trips to disk',
           abs(float(reloaded.lagking['surface_stimp']) - 8.5) < 1e-9,
           reloaded.lagking.get('surface_stimp'))
+    check('setup distance saves as a number, not the label',
+          abs(float(reloaded.lagking['setup_distance_ft']) - 3.0) < 1e-9,
+          reloaded.lagking.get('setup_distance_ft'))
 
     # --- a settings file written before these keys existed must still load --
     stale = os.path.join(tmp, 'stale')
@@ -161,6 +181,7 @@ def main():
     # Imported late: it needs QtBluetooth, which PySide6-Essentials may lack.
     try:
         from src.bluetooth.lagking_device import LagKingDevice
+        from src.worker_device_lagking import WorkerDeviceLagKing as _W
     except ImportError as e:
         print(f'skip  launch-speed maths (QtBluetooth unavailable: {e})')
         print(f'\n{_passed} checks passed')
@@ -191,6 +212,39 @@ def main():
               LagKingDevice.SETUP_DISTANCE_FT_DEFAULT)) < 1e-12)
     check('degenerate inputs pass through untouched',
           ls(0.0, 10.0) == 0.0 and ls(2.40, 0.0) == 2.40)
+
+    # --- battery payload parsing ------------------------------------------
+    import struct as _struct
+
+    class _Probe(LagKingDevice):
+        def __init__(self):            # bypass BLE construction entirely
+            self._last_battery = None
+            self.seen = []
+        def _emit(self, soc, chg): self.seen.append((soc, chg))
+
+    probe = _Probe()
+    probe.battery_update = type('S', (), {'emit': lambda _s, a, b: probe.seen.append((a, b))})()
+    full = _struct.pack('<fBBfB', 3.9, 74, 0, 3.88, 0)
+    probe._handle_battery(full)
+    check('battery payload parses soc + charging', probe.seen == [(74, False)],
+          str(probe.seen))
+    probe._handle_battery(full)
+    check('an unchanged battery notify is not re-reported',
+          probe.seen == [(74, False)], str(probe.seen))
+    probe._handle_battery(_struct.pack('<fBBfB', 4.1, 74, 1, 4.08, 0))
+    check('a charging-state change IS reported',
+          probe.seen[-1] == (74, True), str(probe.seen))
+    probe._handle_battery(b'\x00\x00')
+    check('a truncated battery payload is ignored', len(probe.seen) == 2,
+          str(probe.seen))
+    # Prefix read: a 6-byte payload from older firmware must still work.
+    probe._handle_battery(_struct.pack('<fBB', 3.7, 55, 0))
+    check('a 6-byte prefix payload still parses', probe.seen[-1] == (55, False),
+          str(probe.seen))
+
+    check('signal labels band correctly', [
+        _W._signal_label(v) for v in (-50, -70, -80, -95)
+    ] == ['strong', 'good', 'weak', 'very weak — check the antenna'])
 
     print(f'\n{_passed} checks passed')
 
