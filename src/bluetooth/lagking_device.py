@@ -42,13 +42,23 @@ class LagKingDevice(BluetoothDeviceBase):
 
     putt_received = Signal(BallData)
 
-    # No heartbeat on the LagKing side — the firmware doesn't require one.
-    # Pick a long interval just to satisfy BluetoothDeviceBase.
-    HEARTBEAT_INTERVAL = 60_000
+    # Drives the on-green keepalive (see _heartbeat). 30 s sits comfortably
+    # inside the gate's 5-minute connector soft-sleep window even if a couple
+    # of writes are dropped, which Windows BLE stacks do occasionally.
+    HEARTBEAT_INTERVAL = 30_000
     DEVICE_HEARTBEAT_INTERVAL = 600_000
 
     SERVICE_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8091}'))
     PUTT_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8092}'))
+    # Written, never subscribed. All live on the same primary service.
+    WAKE_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8104}'))
+    CLIENT_KIND_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8112}'))
+    SOFT_SLEEP_NOW_CHAR_UUID = QBluetoothUuid(QUuid('{4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8113}'))
+
+    # Value the gate expects on CLIENT_KIND to classify us as a connector
+    # rather than a phone. Load-bearing: without it the gate applies the
+    # 1-minute APP soft-sleep timeout instead of the 5-minute connector one.
+    CLIENT_KIND_CONNECTOR = 1
 
     PUTT_NOTIFICATION_SIZE = 29
     SIGNED_PUTT_NOTIFICATION_SIZE = 47
@@ -91,6 +101,7 @@ class LagKingDevice(BluetoothDeviceBase):
         # Overwritten by apply_settings() before any putt arrives; this is
         # only the fallback if the settings push were ever missed.
         self._surface_stimp = 10.0
+        self._on_green = False
         self._services = []
         self._primary_service: BluetoothDeviceService = BluetoothDeviceService(
             device,
@@ -103,7 +114,7 @@ class LagKingDevice(BluetoothDeviceBase):
         # As soon as we're subscribed the device is considered ready —
         # no auth handshake to complete.
         self._primary_service.notifications_subscribed.connect(
-            lambda _uuid: self.launch_monitor_connected.emit()
+            self._on_subscribed
         )
         super().__init__(
             device,
@@ -111,6 +122,55 @@ class LagKingDevice(BluetoothDeviceBase):
             LagKingDevice.HEARTBEAT_INTERVAL,
             LagKingDevice.DEVICE_HEARTBEAT_INTERVAL,
         )
+
+    def _on_subscribed(self, _uuid) -> None:
+        # Identify as a connector BEFORE anything else. ble_appClientConnected()
+        # in the firmware treats any peer that has NOT written this as a phone,
+        # and picks the 1-minute app soft-sleep timeout accordingly -- so the
+        # gate would sleep mid-hole with its rear emitters off and swallow the
+        # putt that woke it.
+        self._write(
+            LagKingDevice.CLIENT_KIND_CHAR_UUID,
+            bytearray([LagKingDevice.CLIENT_KIND_CONNECTOR]),
+            'client-kind',
+        )
+        self.launch_monitor_connected.emit()
+
+    def _write(self, uuid: QBluetoothUuid, data: bytearray, what: str) -> None:
+        """Best-effort characteristic write.
+
+        Every write here is an optimisation, never correctness: an older gate
+        may not expose the characteristic at all. Failing loudly would turn a
+        cosmetic gap into a broken putting session, so log and carry on.
+        """
+        try:
+            self._primary_service.write_characteristic(uuid, data)
+        except Exception as e:
+            logging.debug(f'LagKing {what} write failed: {e}')
+
+    def set_on_green(self, on_green: bool) -> None:
+        """Follow GSPro's club selection: putter out = player is on the green.
+
+        Awake the gate draws ~347 mA against ~79 mA in soft sleep, and a round
+        is mostly full shots, so holding it awake for the whole round wastes
+        most of a battery. Tracking the club instead means it is awake exactly
+        when a putt can arrive.
+        """
+        if on_green == self._on_green:
+            return
+        self._on_green = on_green
+        if on_green:
+            self._write(LagKingDevice.WAKE_CHAR_UUID, bytearray([1]), 'wake')
+        else:
+            self._write(
+                LagKingDevice.SOFT_SLEEP_NOW_CHAR_UUID, bytearray([1]), 'sleep-now'
+            )
+
+    def _heartbeat(self) -> None:
+        # Only while the putter is out. An idle connector must never hold the
+        # gate awake -- that is the whole point of following the club.
+        if self._on_green:
+            self._write(LagKingDevice.WAKE_CHAR_UUID, bytearray([1]), 'wake')
 
     def apply_settings(self, surface_stimp: float) -> None:
         if surface_stimp and surface_stimp > 0.01:

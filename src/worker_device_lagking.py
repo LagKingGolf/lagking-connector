@@ -35,6 +35,7 @@ class WorkerDeviceLagKing(WorkerBase):
         self._scanner: BluetoothDeviceScanner | None = None
         self._device: LagKingDevice | None = None
         self._surface_stimp = 10.0
+        self._on_green = False
 
     def apply_settings(self, surface_stimp: float) -> None:
         """Push Putting Settings down to the live device (if any).
@@ -67,6 +68,10 @@ class WorkerDeviceLagKing(WorkerBase):
         logging.debug(f'LagKing gate found: {device.name()}')
         self._device = LagKingDevice(device)
         self._device.apply_settings(self._surface_stimp)
+        # A gate that connects (or reconnects) mid-round must inherit the
+        # club state we already know, or it sits awake/asleep incorrectly
+        # until the player next changes club.
+        self._device.set_on_green(self._on_green)
         self._device.shot.connect(self.shot.emit)
         self._device.connected.connect(lambda msg: self.connected.emit(msg))
         self._device.disconnected.connect(self._on_device_disconnected)
@@ -113,12 +118,22 @@ class WorkerDeviceLagKing(WorkerBase):
             self._scanner = None
         super().shutdown()
 
-    # The connector's putting flow signals club selection so launch
-    # monitors can disarm during full swings. LagKing is putt-only —
-    # nothing to do here, but the base WorkerBase contract expects the
-    # method to exist.
     def club_selected(self, club: str) -> None:
+        """GSPro tells us the club; the putter means the player is on the green.
+
+        We use that to sleep the gate through the full-shot part of every hole
+        and wake it for the putts. WorkerBase.putter_selected() is the test
+        ('PT'), and super() records the club that it reads.
+        """
         super().club_selected(club)
+        on_green = self.putter_selected()
+        if on_green != self._on_green:
+            self._on_green = on_green
+            self.status.emit(
+                'Gate', 'awake — on the green' if on_green else 'asleep — off the green'
+            )
+        if self._device is not None:
+            self._device.set_on_green(on_green)
 
     def send_error(self, error) -> None:
         self.error.emit((error,))
