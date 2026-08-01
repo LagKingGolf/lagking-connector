@@ -13,7 +13,7 @@
 import logging
 
 from PySide6.QtBluetooth import QBluetoothDeviceInfo
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Q_ARG, QMetaObject, Qt, Signal, Slot
 
 from src.ball_data import BallData
 from src.bluetooth.bluetooth_device_scanner import BluetoothDeviceScanner
@@ -49,12 +49,47 @@ class WorkerDeviceLagKing(WorkerBase):
         if setup_distance_ft:
             self._setup_distance_ft = setup_distance_ft
         if self._device is not None:
-            self._device.apply_settings(surface_stimp, self._setup_distance_ft)
+            # QUEUED: the QLowEnergyService belongs to the device's thread and
+            # Qt Bluetooth objects are not thread-safe. apply_settings is called
+            # from the GUI thread (settings save), and a plain call would run
+            # the body -- including writeCharacteristic -- right there.
+            QMetaObject.invokeMethod(
+                self._device, 'apply_settings', Qt.ConnectionType.QueuedConnection,
+                Q_ARG(float, float(surface_stimp)),
+                Q_ARG(float, float(self._setup_distance_ft)),
+            )
 
     def run(self) -> None:
+        # Deliberately does NOT scan. run() is bound to QThread.started, which
+        # fires while MainWindow is still being CONSTRUCTED -- so scanning here
+        # meant a BLE discovery before any window appeared, and (because
+        # LagKing is this fork's default putting system) an unprompted "no gate
+        # found" modal ~40 s into launch for every user who does not own one.
+        #
+        # Worse, it was a ONE-SHOT: QThread.started never fires again, and
+        # WorkerBase.start() only flips a flag, so once that first scan failed
+        # nothing could ever restart it and the Start button was dead for the
+        # rest of the process.
+        #
+        # Upstream's own BLE devices scan from the Start button
+        # (device_launch_monitor_bluetooth_base.server_start_stop); this now
+        # matches. start_scanning() is the entry point, invoked queued so the
+        # scanner and device are built on THIS thread.
         self.started.emit()
-        logging.debug(f'{self.name} starting — scanning for LagKing gate')
+        logging.debug(f'{self.name} ready — waiting for Start')
+
+    @Slot()
+    def start_scanning(self) -> None:
+        logging.debug(f'{self.name} scanning for LagKing gate')
         self._start_scan()
+
+    @Slot()
+    def stop_scanning(self) -> None:
+        if self._scanner is not None:
+            try:
+                self._scanner.stop_scanning()
+            except Exception as e:
+                logging.debug(f'{self.name} stop_scanning: {e}')
 
     def _start_scan(self) -> None:
         if self._scanner is not None:
@@ -166,7 +201,13 @@ class WorkerDeviceLagKing(WorkerBase):
                 'Gate', 'awake — on the green' if on_green else 'asleep — off the green'
             )
         if self._device is not None:
-            self._device.set_on_green(on_green)
+            # QUEUED for the same reason as apply_settings -- club_selected is
+            # delivered on the GUI thread and fires on every club change, the
+            # most frequent event in a round.
+            QMetaObject.invokeMethod(
+                self._device, 'set_on_green', Qt.ConnectionType.QueuedConnection,
+                Q_ARG(bool, bool(on_green)),
+            )
 
     def send_error(self, error) -> None:
         self.error.emit((error,))

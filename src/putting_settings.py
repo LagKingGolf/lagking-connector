@@ -31,9 +31,15 @@ class PuttingSettings(SettingsBase):
             ), {
                 # LagKing is the default putting system in this fork. Only
                 # affects a FRESH settings file — an existing install keeps
-                # whatever the user already chose. Selecting it merely builds
-                # the device; no BLE scan happens until Start is pressed, so
-                # this is inert for anyone without a gate.
+                # whatever the user already chose.
+                #
+                # Selecting it builds the device but does NOT scan; the BLE
+                # scan starts from the putting Start button
+                # (DevicePuttingLagKing.start_app). That was not true when this
+                # default was introduced — the scan ran during MainWindow
+                # construction, so making LagKing the default meant every user
+                # without a gate got an unprompted error before the window even
+                # appeared. Keep it start-driven.
                 "system": "LagKing",
                 "webcam": {
                     "camera": 0,

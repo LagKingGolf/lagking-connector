@@ -24,7 +24,7 @@ import logging
 import struct
 
 from PySide6.QtBluetooth import QBluetoothDeviceInfo, QBluetoothUuid, QLowEnergyCharacteristic
-from PySide6.QtCore import QUuid, QByteArray, Signal
+from PySide6.QtCore import QUuid, QByteArray, Signal, Slot
 
 from src.ball_data import BallData, PuttType
 from src.bluetooth.bluetooth_device_base import BluetoothDeviceBase
@@ -152,17 +152,34 @@ class LagKingDevice(BluetoothDeviceBase):
         self.launch_monitor_connected.emit()
 
     def _write(self, uuid: QBluetoothUuid, data: bytearray, what: str) -> None:
-        """Best-effort characteristic write.
+        """Best-effort characteristic write. Genuinely optional, never fatal.
 
-        Every write here is an optimisation, never correctness: an older gate
-        may not expose the characteristic at all. Failing loudly would turn a
-        cosmetic gap into a broken putting session, so log and carry on.
+        Checks the characteristic BEFORE writing rather than catching an
+        exception, because BluetoothDeviceService.write_characteristic does not
+        raise on a missing or unwritable characteristic -- it EMITS `error`,
+        which BluetoothDeviceBase routes into the device's fatal error path. So
+        the old try/except could not do what it claimed: against a gate whose
+        firmware predates one of these characteristics, an "optional" write
+        produced a modal dialog and stopped putting for the session.
         """
         try:
-            self._primary_service.write_characteristic(uuid, data)
+            service = self._primary_service._service
+            if service is None:
+                logging.debug(f'LagKing {what}: service not ready, skipping')
+                return
+            characteristic = service.characteristic(uuid)
+            if not characteristic.isValid() or not (
+                QLowEnergyCharacteristic.PropertyType.Write & characteristic.properties()
+            ):
+                logging.debug(
+                    f'LagKing {what}: not supported by this gate, skipping'
+                )
+                return
+            service.writeCharacteristic(characteristic, QByteArray(bytes(data)))
         except Exception as e:
             logging.debug(f'LagKing {what} write failed: {e}')
 
+    @Slot(bool)
     def set_on_green(self, on_green: bool) -> None:
         """Follow GSPro's club selection: putter out = player is on the green.
 
@@ -187,6 +204,7 @@ class LagKingDevice(BluetoothDeviceBase):
         if self._on_green:
             self._write(LagKingDevice.WAKE_CHAR_UUID, bytearray([1]), 'wake')
 
+    @Slot(float, float)
     def apply_settings(self, surface_stimp: float,
                        setup_distance_ft: float | None = None) -> None:
         if surface_stimp and surface_stimp > 0.01:

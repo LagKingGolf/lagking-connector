@@ -41,6 +41,8 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+# ...except our own build spec, which ships with the fork.
+!LagKingConnector.spec
 
 # Installer logs
 pip-log.txt

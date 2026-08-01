@@ -4,7 +4,7 @@ To create the exe:
 https://plainenglish.io/blog/pyinstaller-exe-false-positive-trojan-virus-resolved-b33842bd3184
 
 2. Create exe:
-pyinstaller --onefile -w .\MLM2Pro-GSPro-Connector.py
+pyinstaller --onefile -w .\LagKingConnector.py
 
 3. Copy .exe to test dictory & test
 
@@ -13,6 +13,6 @@ pyinstaller --onefile -w .\MLM2Pro-GSPro-Connector.py
 
 Using Nuitka:
 
-python -m nuitka --onefile --show-progress --show-modules --enable-plugin=pyside6 --output-dir=nuitka-build --windows-console-mode=disable .\MLM2Pro-GSPro-Connector.py
+python -m nuitka --onefile --show-progress --show-modules --enable-plugin=pyside6 --output-dir=nuitka-build --windows-console-mode=disable .\LagKingConnector.py
 
 Add  --remove-output to delete build directory after build
