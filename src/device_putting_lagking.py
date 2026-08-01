@@ -28,10 +28,9 @@ class DevicePuttingLagKing(DevicePuttingBase):
         lagking = getattr(self.main_window.putting_settings, 'lagking', {}) or {}
         try:
             surface_stimp = float(lagking.get('surface_stimp', 10.0))
-            calibration = float(lagking.get('speed_calibration', 1.0))
         except (TypeError, ValueError):
-            surface_stimp, calibration = 10.0, 1.0
-        self.device_worker.apply_settings(surface_stimp, calibration)
+            surface_stimp = 10.0
+        self.device_worker.apply_settings(surface_stimp)
 
     def reload_putting_rois(self):
         # Base hook fired whenever Putting Settings are saved -- re-push so a

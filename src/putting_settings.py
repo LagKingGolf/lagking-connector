@@ -71,11 +71,7 @@ class PuttingSettings(SettingsBase):
                     # on this number. Used to recover true launch speed, which
                     # is what GSPro expects from a launch monitor. GSPro owns
                     # the green being simulated -- that is not our business.
-                    "surface_stimp": 10.0,
-                    # Empirical trim applied after the launch-speed recovery.
-                    # 1.0 = model only. Raise if putts finish short in GSPro,
-                    # lower if they run long. Calibrate with a tape measure.
-                    "speed_calibration": 1.0
+                    "surface_stimp": 10.0
                 }
             }
         )

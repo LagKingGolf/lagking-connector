@@ -88,10 +88,9 @@ class LagKingDevice(BluetoothDeviceBase):
         return cls.STIMP_REF_SPEED_MPS * (total ** (1.0 / cls.STIMP_ROLLOUT_EXPONENT))
 
     def __init__(self, device: QBluetoothDeviceInfo):
-        # Overwritten by apply_settings() before any putt arrives; these are
-        # only the fallbacks if the settings push were ever missed.
+        # Overwritten by apply_settings() before any putt arrives; this is
+        # only the fallback if the settings push were ever missed.
         self._surface_stimp = 10.0
-        self._speed_calibration = 1.0
         self._services = []
         self._primary_service: BluetoothDeviceService = BluetoothDeviceService(
             device,
@@ -113,11 +112,9 @@ class LagKingDevice(BluetoothDeviceBase):
             LagKingDevice.DEVICE_HEARTBEAT_INTERVAL,
         )
 
-    def apply_settings(self, surface_stimp: float, speed_calibration: float) -> None:
+    def apply_settings(self, surface_stimp: float) -> None:
         if surface_stimp and surface_stimp > 0.01:
             self._surface_stimp = float(surface_stimp)
-        if speed_calibration and speed_calibration > 0.01:
-            self._speed_calibration = float(speed_calibration)
 
     def _data_handler(
         self, characteristic: QLowEnergyCharacteristic, data: QByteArray
@@ -157,12 +154,9 @@ class LagKingDevice(BluetoothDeviceBase):
         ball_data.putt_type = PuttType.LAGKING
         ball_data.good_shot = True
         ball_data.club = 'PT'
-        # Recover launch speed from the gate reading, apply the user's
-        # calibration trim, then convert m/s -> mph for GSPro.
+        # Recover launch speed from the gate reading, then m/s -> mph.
         launch_mps = self.launch_speed_mps(speed_mps, self._surface_stimp)
-        ball_data.speed = round(
-            launch_mps * self._speed_calibration * METERS_PER_S_TO_MPH, 2
-        )
+        ball_data.speed = round(launch_mps * METERS_PER_S_TO_MPH, 2)
         # HLA: degrees, positive = right of target (matches GSPro).
         # Hide the value if the gate didn't have a confident angle read —
         # default to 0 (straight) rather than passing noise through.

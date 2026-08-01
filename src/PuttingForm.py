@@ -66,21 +66,6 @@ class PuttingForm(QWidget, Ui_PuttingForm):
         row.addStretch(1)
         outer.addLayout(row)
 
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel('Speed calibration', box))
-        self.lagking_speed_calibration_spin = QDoubleSpinBox(box)
-        self.lagking_speed_calibration_spin.setRange(0.50, 1.50)
-        self.lagking_speed_calibration_spin.setSingleStep(0.01)
-        self.lagking_speed_calibration_spin.setDecimals(2)
-        self.lagking_speed_calibration_spin.setToolTip(
-            'Fine trim on top of the stimp correction. 1.00 = model only.\n'
-            'Putt a known distance and compare against GSPro: raise this if\n'
-            'putts finish short, lower it if they run long.'
-        )
-        row2.addWidget(self.lagking_speed_calibration_spin)
-        row2.addStretch(1)
-        outer.addLayout(row2)
-
         self.verticalLayout.insertWidget(0, box)
 
     def __setup_ui(self):
@@ -116,7 +101,6 @@ class PuttingForm(QWidget, Ui_PuttingForm):
     def __load_values(self):
         lagking = getattr(self.settings, 'lagking', {}) or {}
         self.lagking_surface_stimp_spin.setValue(float(lagking.get('surface_stimp', 10.0)))
-        self.lagking_speed_calibration_spin.setValue(float(lagking.get('speed_calibration', 1.0)))
         self.webcam_camera_combo.setCurrentText(str(self.settings.webcam['camera']))
         self.webcam_ball_color_combo.setCurrentText(self.settings.webcam['ball_color'])
         self.webcam_auto_start_combo.setCurrentText(self.settings.webcam['auto_start'])
@@ -141,7 +125,6 @@ class PuttingForm(QWidget, Ui_PuttingForm):
             if not isinstance(getattr(self.settings, 'lagking', None), dict):
                 self.settings.lagking = {}
             self.settings.lagking['surface_stimp'] = self.lagking_surface_stimp_spin.value()
-            self.settings.lagking['speed_calibration'] = self.lagking_speed_calibration_spin.value()
             #self.settings.exputt['camera'] = int(self.exputt_capture_card_combo.currentText())
             self.settings.webcam['params'] = self.ball_tracking_app_params_edit.toPlainText()
             self.settings.exputt['window_name'] = self.exputt_camera_window_title_edit.toPlainText()
