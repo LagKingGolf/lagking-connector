@@ -58,6 +58,11 @@ Note the two MLM2PRO entries are different mechanisms, not a preference:
 `MLM2PRO BT` is direct Bluetooth (needs the key above), `MLM2PRO` is the
 phone-mirror route (Rapsodo Range on the phone, mirrored to the PC, read by OCR).
 
+Restoring the key is necessary but **not sufficient** — the Bluetooth path also
+needs a third-party authorization performed in the Rapsodo phone app, and the
+right app to authorize is not the obvious one. See
+[docs/MLM2PRO_SETUP.md](docs/MLM2PRO_SETUP.md).
+
 ### Bluetooth
 
 Pair the gate in Windows Bluetooth settings first. Many desktop sim PCs have no
@@ -115,3 +120,10 @@ Order matters; item 4 is the one people skip.
    does with it. The launch-speed recovery is derived from the gate's own
    roll-out model; if GSPro's putting physics differs materially, this is
    where it shows up.
+7. **With a Bluetooth launch monitor selected (MLM2PRO BT / R10 BT) AND
+   auto-start on, confirm the launch monitor is still found at launch.** Our
+   putting default is `LagKing`, so auto-start now fires a second Bluetooth scan
+   alongside the launch monitor's — upstream defaulted putting to `None`, making
+   that call a no-op, so this concurrency is new to this fork and untested.
+   If the launch monitor becomes slow or impossible to find, that is the cause,
+   and the fix is to sequence the two starts rather than run them together.

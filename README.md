@@ -34,10 +34,15 @@ Complete corresponding source is this repository.
 Every launch monitor springbok supports works here unchanged — this fork adds a
 putting input, it removes nothing.
 
-One build note: `Rapsodo MLM2PRO BT` needs `src/bluetooth/mlm2pro_secret.py`,
+**Rapsodo MLM2PRO owners: read [docs/MLM2PRO_SETUP.md](docs/MLM2PRO_SETUP.md)
+before you start.** The Bluetooth path needs a third-party authorization done in
+the Rapsodo phone app first, and you must authorize **Awesome Golf, not GSPro** —
+the GSPro entry is Rapsodo's own official integration, which is the one without
+putting. Skipping that step produces an error that reads like a broken install.
+
+One build note: `Rapsodo MLM2PRO BT` also needs `src/bluetooth/mlm2pro_secret.py`,
 which upstream gitignores, so it is absent from a fresh clone. Restore it from
-upstream history before building — see [RUNNING.md](RUNNING.md). Skip that step
-and MLM2PRO BT silently fails while everything else works.
+upstream history before building — see [RUNNING.md](RUNNING.md).
 
 ## LagKing putting input
 
