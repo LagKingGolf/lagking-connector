@@ -21,7 +21,8 @@ class BluetoothDeviceService(QObject):
                  service_uuid: QBluetoothUuid,
                  characteristic_uuids: Optional[list[QBluetoothUuid]],
                  notification_handler: Optional[Callable],
-                 read_handler: Optional[Callable]) -> None:
+                 read_handler: Optional[Callable],
+                 best_effort: bool = False) -> None:
         super().__init__()
         self._service_uuid: QBluetoothUuid = service_uuid
         self._characteristic_uuids: list[QBluetoothUuid] = characteristic_uuids
@@ -30,6 +31,13 @@ class BluetoothDeviceService(QObject):
         self._service: Optional[QLowEnergyService] = None
         self._notifications = []
         self._ble_device: QBluetoothDeviceInfo = ble_device
+        # best_effort: skip characteristics that are missing or lack a CCC
+        # descriptor instead of treating them as fatal, and report subscribed
+        # as long as at least one characteristic took. Lets one service object
+        # carry a mixed list (e.g. putts + battery) without an optional line
+        # taking down the whole subscription. Default False = upstream
+        # behavior, unchanged for every other launch monitor.
+        self._best_effort: bool = best_effort
 
     def connect_to_service(self,
                            discovered_services: list[QBluetoothUuid],
@@ -80,6 +88,8 @@ class BluetoothDeviceService(QObject):
             if not characteristic.isValid():
                 msg = f"Couldn't find characteristic {uuid.toString()} on {self._ble_device.name()}."
                 logging.debug(msg)
+                if self._best_effort:
+                    continue
                 self.error.emit(msg)
                 return
             # Get the descriptor for client characteristic configuration
@@ -89,12 +99,19 @@ class BluetoothDeviceService(QObject):
             if not descriptor.isValid():
                 msg = f"Characteristic descriptor is invalid for {uuid.toString()} on {self._ble_device.name()}."
                 logging.debug(msg)
+                if self._best_effort:
+                    continue
                 self.error.emit(msg)
                 return
             self._notifications.append(descriptor)
             # Subscribe to notifications for the characteristic
             self._service.writeDescriptor(descriptor, BluetoothDeviceService.ENABLE_NOTIFICATION)
             print(f'Subscribed to notifications for {uuid.toString()} on {self._ble_device.name()}')
+        if self._best_effort and not self._notifications:
+            msg = f"No subscribable characteristics on {self._ble_device.name()} for service {self._service_uuid.toString()}."
+            logging.debug(msg)
+            self.error.emit(msg)
+            return
         self.notifications_subscribed.emit(self._service_uuid)
 
     def unsubscribe_from_notifications(self) -> None:

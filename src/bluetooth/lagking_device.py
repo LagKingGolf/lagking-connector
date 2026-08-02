@@ -118,31 +118,27 @@ class LagKingDevice(BluetoothDeviceBase):
         self._last_battery = None
         self._on_green = False
         self._services = []
+        # ONE service object for the whole 8091 service, putts and battery on
+        # the same subscribe list. These were two BluetoothDeviceService
+        # objects (so a battery subscribe failure could not take down the
+        # putt handshake), but two objects wrapping the SAME GATT service is
+        # wrong on Qt's Windows backend: characteristicChanged is delivered to
+        # every service object of that service, so each putt fired the handler
+        # twice and every shot went to GSPro twice -- and the two concurrent
+        # discoverDetails() calls raced, sometimes wedging the connect in
+        # RemoteServiceDiscovering (both observed live 2026-08-01). best_effort
+        # now provides the missing-characteristic tolerance the split existed
+        # for: an unsubscribable line is skipped, not fatal, and
+        # notifications_subscribed still fires as long as anything took.
         self._primary_service: BluetoothDeviceService = BluetoothDeviceService(
             device,
             LagKingDevice.SERVICE_UUID,
-            [LagKingDevice.PUTT_CHAR_UUID],
+            [LagKingDevice.PUTT_CHAR_UUID, LagKingDevice.BATTERY_CHAR_UUID],
             self._data_handler,
             None,
+            best_effort=True,
         )
         self._services.append(self._primary_service)
-        # Battery gets its OWN service object rather than sharing the primary
-        # subscribe list. BluetoothDeviceService.subscribe_to_notifications
-        # RETURNS on the first characteristic it cannot subscribe to -- before
-        # emitting notifications_subscribed. So a battery failure on the shared
-        # list would silently skip _on_subscribed entirely: no CLIENT_KIND write
-        # (leaving the gate on the 1-minute phone sleep timeout), no setup
-        # distance pushed, and never reporting Connected -- while putts kept
-        # arriving. A status line must not be able to take the identify
-        # handshake down with it.
-        self._battery_service: BluetoothDeviceService = BluetoothDeviceService(
-            device,
-            LagKingDevice.SERVICE_UUID,
-            [LagKingDevice.BATTERY_CHAR_UUID],
-            self._data_handler,
-            None,
-        )
-        self._services.append(self._battery_service)
         # As soon as we're subscribed the device is considered ready —
         # no auth handshake to complete.
         self._primary_service.notifications_subscribed.connect(
