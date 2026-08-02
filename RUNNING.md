@@ -1,4 +1,4 @@
-# Running the LagKing Connector
+# Running MLM2PRO-GSPro-Connector (LagKing fork)
 
 Two audiences: someone who wants to **run it from source on Windows** (that's
 the real thing), and someone who wants to **check their changes anywhere else**

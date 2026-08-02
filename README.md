@@ -1,4 +1,4 @@
-# LagKing Connector
+# MLM2PRO-GSPro-Connector — LagKing fork
 
 Free, open-source GSPro connector for a wide range of launch monitors, with
 **LagKing** measured putting built in alongside Webcam and ExPutt.
@@ -207,7 +207,7 @@ You can access Joe's YouTube channel [here](https://www.youtube.com/@JLagGOLF)
 
 ## Latest Release
 
-LagKing Connector releases: [LagKingGolf/lagking-connector/releases](https://github.com/LagKingGolf/lagking-connector/releases).
+This fork's releases: [LagKingGolf/lagking-connector/releases](https://github.com/LagKingGolf/lagking-connector/releases).
 
 Upstream's own releases (springbok's build, without the LagKing putting input) are [here](https://github.com/springbok/MLM2PRO-GSPro-Connector/releases)
 

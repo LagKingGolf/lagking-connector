@@ -13,7 +13,7 @@ For `Rapsodo MLM2PRO BT`, the direct-Bluetooth entry.
 
 It came later. Rapsodo's own GSPro integration handles full swings and carries
 **no putting**. Wiring in a putting device is the reason to run a springbok-line
-connector at all now, and it is why LagKing Connector exists.
+connector at all now, and it is why this fork exists.
 
 That has a direct consequence for step 2 below.
 
@@ -26,7 +26,7 @@ That has a direct consequence for step 2 below.
    This connector rides a different slot and forwards to GSPro itself.
 3. **Disconnect from the MLM2PRO in the phone app.** The unit accepts one
    Bluetooth connection, so the phone has to let go before the PC can take it.
-4. **In LagKing Connector**, select `Rapsodo MLM2PRO BT` and press Start.
+4. **In the connector**, select `Rapsodo MLM2PRO BT` and press Start.
 
 Steps 1–3 happen entirely in Rapsodo's app. The connector has no visibility into
 them and cannot do them for you — see below.
