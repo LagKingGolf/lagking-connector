@@ -75,3 +75,28 @@ Square's tile digits are well under that, and adjacent-digit confusion (9/8,
 zoom path; Square gets none.
 
 So: measure before changing. `ocr_bench.py` in this folder does that.
+
+## Measured on the fixtures (2026-08-07)
+
+Cropped the Ball Speed tile out of `square-3.png` with `sips` and blew it up 8x
+(no OCR tooling on that machine, so this is a pixel measurement, not a read):
+
+- **Cap height ≈ 19 px** natively. Tesseract's own guidance is roughly 30 px;
+  below that, adjacent-glyph discrimination degrades first.
+- **Thin geometric sans, 1–2 px antialiased strokes.** In this face the feature
+  separating **9 from 8** and **6 from 5** is whether the lower bowl closes —
+  which is precisely the pair of substitutions observed.
+- **Light tan text on a near-black tile.** The current Square path converts to
+  greyscale and stops, so Tesseract is handed inverted-polarity text. It copes,
+  but it is trained for dark-on-light.
+
+So both candidate fixes now have support, and they are independent:
+
+1. **Upscale** — addresses the 19 px vs 30 px shortfall directly.
+2. **Binarize + invert** — addresses polarity and kills the antialiasing that
+   blurs the bowl closures.
+
+`ocr_bench.py` already crosses both (upscale x2/x3/x4, binarize, and the
+combinations), so running it should separate them rather than shipping both on
+faith. Run it on the Windows box that builds the exe — that environment already
+has tesserocr, opencv and Pillow.
